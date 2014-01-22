@@ -1,0 +1,89 @@
+
+
+
+(let ((x 1)
+      (y 2)
+      (z (something 3)))
+
+  (activity x y z))
+==>
+(lambda x, y, z: \
+  (activity(x[0], y[0], z[0]),)[-1])([1],[2],[something(3)])
+
+
+
+(let ((x 1)
+      (y 2)
+      (z None))
+
+  (setf z (something (+ x y)))
+  (activity x y z))
+==>
+# we need the illusion of mutable closures!!
+(lambda x, y, z: \
+  (z.__setitem__(0, something(x[0] + y[0])),
+   activity(x[0], y[0], z[0]))[-1])([1], [2], [None])
+
+
+
+(if foo 1 2)
+==>
+((lambda: 1),(lambda: 2))[not (f)]
+
+
+
+(cond
+ ((eq c 1)
+  (print "one"))
+ ((eq c 2)
+  (print "two"))
+ (else
+  print "lots"))
+==>
+(if (eq c 1) (print "one")
+  (if (eq c 2) (print "two")
+    (print "lots")))
+
+
+
+(define make_adder
+  (lambda (by)
+    (lambda (x) (+ x by))))
+==>
+make_adder = lambda by: lambda x: x + by
+
+
+
+(define add_8
+  (make_adder 8))
+==>
+add_8 = make_adder(8)
+
+
+
+(defclass Foo (object)
+       (define x 1)
+       (defun __init__ (self x)
+	 (setf self 'x x))))
+==>
+class Foo(object):
+    x = 1
+    def __init__(self, x):
+        self.setattr("x", x)
+
+
+
+(define f (Foo))
+
+(print (getf f 'x))
+
+(setf f 'x 100)
+(print (getf f 'x))
+
+(set f.x 100)
+(print f.x)
+
+
+
+;
+; The end.

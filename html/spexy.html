@@ -1,0 +1,280 @@
+<html>
+
+<head>
+<title>Spexy, Write Your Python In Lisp</title>
+
+<style type="text/css">
+.special, code {
+  color: green;
+  font-family: monospace;
+}
+</style>
+
+</head>
+
+
+<body>
+<h1>Language Reference</h1>
+
+<p><a href="index.html">Spexy</a> is a Lisp dialect for expressing
+Python.</p>
+
+
+
+<h2>Expressions</h2>
+
+<p>An expressions in Spexy can be a token, a quoted string, a special
+form, or a list of expressions. Tokens are evaluated to bound
+variables, or members of bound variables using dotted notation. List
+members are evaluated in order of appearance, and the first member is
+called as a function with the remaining members as arguments.</p>
+
+<p>Some examples of Spexy expressions:
+
+<ol>
+
+<li><code>&quot;foo&quot;</code> a literal string</li>
+
+<li><code>105</code> a literal number</li>
+
+<li><code>foo</code> the variable foo</li>
+
+<li><code>foo.bar</code> the bar member of the variable foo</li>
+
+<li><code>(foo.bar 5)</code> calling the bar member of the variable
+foo as a function, with the argument 5</li>
+
+</ol>
+</p>
+
+
+
+<h2>Special Forms</h2>
+
+<p>Special forms work similarly to function calls, but their arguments
+may be evaluated later or not at all. Special forms are also not
+beholden to the normal Python variable naming conventions, 'cause
+they're special.</p>
+
+<ul>
+
+<li><a href="#special_op">operators</a>
+(+,-,*,**,/,%,&lt;,&lt;=,&gt;,&gt=,&lt;&lt,&gt;&gt;,and,or)</li>
+
+<li><a href="#special_class">class</a></li>
+
+<li><a href="#special_for_each">for-each</a></li>
+
+<li><a href="#special_generate_while">generate-while</a></li>
+
+<li><a href="#special_generator">generator</a> (or just gen)</li>
+
+<li><a href="#special_getf">getf</a></li>
+
+<li><a href="#special_if">if</a></li>
+
+<li><a href="#special_lambda">lambda</a></li>
+
+<li><a href="#special_let">let</a></li>
+
+<li><a href="#special_letrec">letrec</a></li>
+
+<li><a href="#special_lc">list-comprehension</a> (or just l-c)</li>
+
+<li><a href="#special_progn">progn</a></li>
+
+<li><a href="#special_setf">setf</a></li>
+
+<li><a href="#special_while">while</a></li>
+
+</ul>
+
+
+
+<h3 id="special_op">Operators</h3>
+
+<p class="special">(operator expression1 expression2 [...])</p>
+
+<p>Does what you'd expect, (eg: adds, subtracts) the
+evaluated values of its expressions</p>
+
+<p>The <code>and</code> and <code>or</code> operators are unique in
+that they will shortcut their evaluation of arguments. The
+<code>and</code> operator will return the first false value or the
+last value. The <code>or</code> operator will return the first true
+value or the last value. <i>Neither operator will evaluate any
+expressions after the one returned.</i></p>
+
+
+
+<h3 id="special_class">class</h3>
+
+<p class="special">(class namestr (inherit1 [...]) ([(member val) [...]]))</p>
+
+<p>Creates a new type with the given name, inheritence, and
+members. At a minimum, the inheritence needs to be
+<code>object</code>. The member list may be empty, or may contain
+pairs specifying the member name and the value. The member values will
+be evaluated in order.</p>
+
+<p>All of the special Python member names apply here, such as
+<code>__init__</code>.</p>
+
+<p>The type may be instantiated by calling it like a function.</p>
+
+
+
+<h3 id="special_for_each">for-each</h3>
+
+<p class="special">(for-each func sequence)</p>
+
+<p>Applies func (which must be a function taking one argument) to each item
+in the sequence. Evaluates to None.</p>
+
+
+
+<h3 id="special_generate_while">generate-while</h3>
+
+<p class="special">(generate-while condition expression1 [expression2
+...])</p>
+
+<p>Creates a generator. Obtaining the next item evaluates condition.
+If the condition is false, the generator ends. If the condition is
+true, then the expressions are evaluated in order, with the value of
+the last expression becoming the item for that turn.</p>
+
+
+
+<h3 id="special_generator">generator</h3>
+
+<p class="special">(generator func sequence [filter_func])</p>
+
+<p>Creates a generator. Obtaining the next item calls func (which must
+be a function taking one argument) on the next item in a sequence, and
+collects the results into a new list. If the optional filter function
+is specified (which must also be a function taking one argument), then
+only items which result in the filter returning true will be
+processed. The generator ends when no items are left in the
+sequence.</p>
+
+
+
+<h3 id="special_getf">getf</h3>
+
+<p class="special">(getf var key)</p>
+
+<p>Evaluates to the item of var, by key. Used with lists, tuples, and
+dictionaries</p>
+
+
+
+<h3 id="special_if">if</h3>
+
+<p class="special">(if condition1 then_body1 [condition2 then_body2
+[...]] [else_body])</p>
+
+<p>Evaluates the first condition, and if it is true (in the Pythonic
+sense), evaluates the first body. If the first condition evaluates to
+false, then any other conditions are checked (if present) until a
+matching condition is found, and then its associated body is
+evaluated. If no condition could be evaluated to true, then the
+optional else body is evaluated.</p>
+
+<p>The value of an <code>if</code> form is the value of its evaluated
+body, or None if no body was evaluated (such as when no else body is
+specified)</p>
+
+
+
+<h3 id="special_lambda">lambda</h3>
+
+<p class="special">(lambda ([var ...]) expression1 [expression2
+...])</p>
+
+<p>Creates an anonymous function taking the specified arguments. When
+(and if) the function is called, its expressions are evaluated in
+order, with the overall value of the call being the value of the last
+expression. The expressions are evaluated in order every time the
+function is called. The variables cannot be changed via setf.</p>
+
+
+
+<h3 id="special_let">let</h3>
+
+<p class="special">(let ([(var val) ...]) expression1 [expression2
+...])</p>
+
+<p>Provides a mutable closure for the given expressions, binding
+var,val pairs into the namespace first. The variables can be changed
+via setf.</p>
+
+<p>Evaluates any values in order, then binds them to their associated
+vars. Expressions are then evaluated in order, with the value of the
+last expression being the overall value of the form.</p>
+
+
+
+<h3 id="special_letrec">letrec</h3>
+
+<p class="special">(letrec ([(var val) ...]) expression1 [expression2
+...])</p>
+
+<p>Identical to <code>let</code> with the exception that the variables
+are bound into the namespace first, and the values are evaluated
+within that namespace (and as such, variables may reference each
+other)</p>
+
+
+
+<h3 id="special_lc">list-comprehension</h3>
+
+<p class="special">(list-comprehension func sequence
+[filter_func])</p>
+
+<p>Calls func (which must be a function taking one argument) on each
+item in a sequence, and collects the results into a new list. If the
+optional filter function is specified (which must also be a function
+taking one argument), then only items which result in the filter
+returning true will be collected</p>
+
+
+
+<h3 id="special_progn">progn</h3>
+
+<p class="special">(progn expression1 [expression2 ...]])</p>
+
+<p>Evaluates all argument expressions in order. The overall value of a
+<code>progn</code> form is the value of its last expression</p>
+
+
+
+<h3 id="special_setf">setf</h3>
+
+<p class="special">(setf var val)</p>
+<p class="special">(setf var.member val)</p>
+<p class="special">(setf (getf obj key) val)</p>
+
+<p>The first form sets a variable to the given value</p>
+
+<p>The second form sets a member of a variable to the given value</p>
+
+<p>The third form sets an item of a variable (such as a list or
+dictionary) to the given value</p>
+
+
+
+<h3 id="special_while">while</h3>
+
+<p class="special">(while condition expression1 [expression2 ...])</p>
+
+<p>Repeatedly evaluates condition until it is false. After every
+evaluation of the condition which was true, all expressions are
+evaluated in order.</p>
+
+<p>Overall value is None</p>
+
+
+
+</body>
+
+</html>
