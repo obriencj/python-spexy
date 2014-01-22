@@ -1,0 +1,19 @@
+
+
+(import-from cStringIO (StringIO))
+
+(defun next_fd (fd) (fd.read 1))
+
+(def next_fd_gen (fd)
+     (let ((next (lambda () (fd.read 1)))
+	   (c (next)))
+
+       (while (c)
+	      (yield c)
+	      (setf c (next)))))
+
+
+(defun next_fd_gen (fd)
+  (make-generator
+   (lambda x: x)
+   (while

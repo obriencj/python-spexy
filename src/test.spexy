@@ -1,0 +1,28 @@
+# -*- encoding: spexy -*-
+
+
+;this is a comment, too
+(import sys)
+
+
+; we're cool.
+(let ((x 1)
+      (y 5)
+      (println (lambda (s)
+		 (sys.stdout.write (str s))
+		 (sys.stdout.write "\n"))))
+
+  (println (+ x y))
+  (println None)
+  (println (* x y))
+  (println (** x y)))
+
+
+
+(with ((a (open "output" "w")))
+      (a.write "hello")
+      (a.write "world"))
+
+
+
+; The end.
