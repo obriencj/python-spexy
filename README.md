@@ -43,13 +43,13 @@ mind wrapped around the concepts that underly it, I've discovered that
 I had set some rules for myself in this game of pre-processing.
 
  - **No non-user imports**. The generated Python code is only allowed
-to import what the user explicitly asks it to import. It may not
-inject other imports (which means no functools or itertools).
-- **No additional dependencies**. As an extension to the above, the
-generated Python code cannot require Spexy as a module to function at
-runtime.
-- **No non-user defines**. Don't inject methods or variables into the
-output other than those that the user asks for.
+   to import what the user explicitly asks it to import. It may not
+   inject other imports (which means no functools or itertools).
+ - **No additional dependencies**. As an extension to the above, the
+   generated Python code cannot require Spexy as a module to function
+   at runtime.
+ - **No non-user defines**. Don't inject methods or variables into the
+   output other than those that the user asks for.
 
 The above makes this whole project significantly more interesting, and
 at the same time significantly less useful (as if that were possible)
