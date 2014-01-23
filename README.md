@@ -42,25 +42,21 @@ As I have been reading through all this lost code and trying to get my
 mind wrapped around the concepts that underly it, I've discovered that
 I had set some rules for myself in this game of pre-processing.
 
-No non-user imports
-: The generated Python code is only allowed to import what the user
-explicitly asks it to import. It may not inject other imports (which
-means no functools or itertools).
-   
-No additional dependencies
-: As an extension to the above, the generated Python code cannot
-require Spexy as a module to function at runtime.
-	
-No non-user defines
-: Don't inject methods or variables into the output other than those
-that the user asks for.
+ - **No non-user imports**. The generated Python code is only allowed
+to import what the user explicitly asks it to import. It may not
+inject other imports (which means no functools or itertools).
+- **No additional dependencies**. As an extension to the above, the
+generated Python code cannot require Spexy as a module to function at
+runtime.
+- **No non-user defines**. Don't inject methods or variables into the
+output other than those that the user asks for.
 
 The above makes this whole project significantly more interesting, and
 at the same time significantly less useful (as if that were possible)
 for other users. It's more like a puzzle and less like an actual
 project. Yay!
 
-Here is the original README from 2007:
+Here is the original [README][readme-2007] from 2007:
 
 > The idea here is to use Python's pluggable encoding support to
 create a pre-processor that will take a file of code in SEXP and
@@ -93,10 +89,12 @@ variable assignment.
 [curly-braces encoding]: http://timhatch.com/projects/pybraces/
 "pybraces"
 
+[readme-2007]: https://github.com/obriencj/python-spexy/blob/baed1c2f2409c06fb9d1cefc53f5edc872b045b1/README
+
 
 ## Example Transformations
 
-The following are examples (from the original 2007 spexy.text) that
+The following are examples (from the original 2007 [spexy.text]) that
 show Spexy inputs and their resulting Python outputs.
 
 Note that in many of these cases the actual implementation differs
@@ -108,6 +106,7 @@ Also note that as Python has evolved, better variants are now
 available. In particular the spexy `if` could be a Python
 [conditional expression].
 
+[spexy.text]: https://github.com/obriencj/python-spexy/blob/baed1c2f2409c06fb9d1cefc53f5edc872b045b1/spexy.text
 [conditional expression]: http://docs.python.org/2.5/whatsnew/pep-308.html
 "What's new in Python 2.5 -- PEP 308: Conditional Expressions"
 
