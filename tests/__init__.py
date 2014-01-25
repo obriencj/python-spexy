@@ -8,172 +8,272 @@ author: Christopher O'Brien  <siege@preoccupied.net>
 """
 
 
+from cStringIO import StringIO
+from functools import partial
+from itertools import count
 from sys import stdout
+from unittest import TestCase
+
 import spexy
 
 
+def assoc(col, key, val):
+    col[key] = val
 
-doofoo = lambda x,y: x*y
+
+def build_spexy(src_str):
+    # generate a tree from src_str
+    ptre = spexy.build_tree(StringIO(src_str))
+
+    # convert first expr of tree into Python syntax
+    return spexy.evaluate(spexy.ns_new(), ptre[0])
 
 
+def eval_spexy(src_str, with_globals=None, with_locals=None):
+    if with_globals is None:
+        with_globals = dict(globals())
 
-def build_source(src):
-    from cStringIO import StringIO
+    if with_locals is None:
+        with_locals = dict()
 
-    print src
+    # convert spexy src string into a Python src string
+    peva = build_spexy(src_str)
+
+    # evaluate the resulting Python code
+    return eval(peva, with_globals, with_locals)
+
+
+def test_source(src_str):
+    return eval_spexy(src_str)
     
-    ptre = spexy.build_tree(StringIO(src))
-    ptre = ptre[0]
-    print repr(ptre)
-    
-    peva = spexy.evaluate(spexy.ns_new(), ptre)
-    print peva
-    return peva
+
+def do_add(x, y):
+    # a simple function to be used in a few spexy calls
+    return x + y
 
 
+class EvaluateTests(TestCase):
 
-def eval_source(src):
-    peva = build_source(src)
-    ret = eval(peva, globals())
-    print repr(ret)
-    return ret
+    def test_let_with_unwrapped(self):
+        src = r""" (let ((a 1) (b 2)) (do_add a b)) """
+        result = eval_spexy(src)
+        assert(result == 3)
 
 
+    def test_letrec_with_unwrapped(self):
+        src = r"""
+        (letrec ((a 1)
+                 (b 5)
+                 (c (+ a b)))
+            (do_add a c))
+        """
+        result = eval_spexy(src)
+        assert(result == 7)
 
-def test_source(src):
-    try:
-        return eval_source(src)
+
+    def test_when_with_unwrapped(self):
+        src = r"""
+        (when False (do_add 1 2))
+        """
+        result = eval_spexy(src)
+        assert(result == None)
+
+        src = r"""
+        (when True (do_add 1 2))
+        """
+        result = eval_spexy(src)
+        assert(result == 3)
+
+
+    def test_progn(self):
+
+        # here we want to check that progn evaluates its expressions
+        # in order, and that it evaluates to the value of the last
+        # expression
+
+        vals = [None] * 4
+        X = partial(assoc, vals, 1)
+        Y = partial(assoc, vals, 2)
+        Z = partial(assoc, vals, 3)
+        counter = count(100)
+
+        src = r"""
+        (progn
+            (X (next counter))
+            (Y (next counter))
+            (Z (next counter))
+            (next counter))
+        """
+        result = eval_spexy(src, with_locals=locals())
+
+        assert(vals == [None, 100, 101, 102])
+        assert(result == 103)
         
-    except Exception, e:
-        print e
-        raise
-    
+
+    def test_define(self):
+        src = r"""
+        (let ((a 1)
+              (b 2))
+            (define c (+ a b))
+            c)
+        """
+
+        glbls = dict(globals())
+        result = eval_spexy(src, with_globals=glbls)
+
+        assert(result == 3)
+        assert(glbls['c'] == 3)
 
 
-# testing let and unwrapped calls
-test_source(r"""
-(let ((a 1)
-      (b 2))
-  (doofoo a b))
-""")
+    def test_member(self):
+        src = r"""
+        (let ((x "Hello World"))
+            x.split)
+        """
+        result = eval_spexy(src)
+        assert(type(result) == type("".split))
+
+        src = r"""
+        (let ((x "Hello World"))
+            (x.split))
+        """
+        result = eval_spexy(src)
+        assert(result == "Hello World".split())
 
 
-
-# testing letrec
-test_source(r"""
-(letrec ((a 1)
-         (b 5)
-         (c (+ a b)))
-  (doofoo a c))
-""")
-
-
-
-test_source(r"""
-(when False (doofoo 1 2))
-""")
+    def test_define_shadowing(self):
+        src = r"""
+        (let ((x 100))
+            (let ((a 1)
+                  (b 2))
+        
+                (define x (+ a b))
+                x))
+        """
+        result = eval_spexy(src)
+        assert(result == 100)
 
 
+    def test_defclass(self):
+        src = r"""
+        (defclass Foo (object)
+            ((x 50)
+             (get_x (lambda (self)
+                        self.x))
+             (set_x (lambda (self x)
+                        (setf self.x x)))))
+        """
 
-test_source(r"""
-(when True (doofoo 1 2))
-""")
+        glbls = dict(globals())
+        result = eval_spexy(src, with_globals=glbls)
+        
+        Foo = glbls['Foo']
 
+        assert(result == None)
+        assert(type(Foo) == type)
 
+        f = Foo()
+        assert(f.get_x() == 50)
+        assert(f.set_x(100) == None)
+        assert(f.get_x() == 100)
+        assert(f.x == 100)
 
-# testing lambda, operators, and unwrapped calls
-test_source(r"""
-(let ((my_add (lambda (x y) (+ x y)))
-      (my_mult (lambda (x y) (* x y)))
-      (a 5)
-      (b 6)
-      (my_print (lambda (s) (stdout.write s) (stdout.write "\n"))))
+        
+    def test_let_lambda_setf(self):
+        src = r"""
+        (let ((z 0))
+            (lambda (x)
+                (setf z (+ z x))
+                z))
+        """
+        result = eval_spexy(src)
 
-  (my_print (% "a = %s" a))
-  (my_print (% "b = %s" b))
-  (my_print (str (my_add a b)))
-  (my_print (str (my_mult a b))))
-""")
-
-
-
-# testing setf
-test_source(r"""
-(let ((my_add (lambda (x y) (+ x y)))
-      (my_mult (lambda (x y) (* x y)))
-      (a 5)
-      (b 11)
-      (z 0)
-      (my_print (lambda (s) (stdout.write s) (stdout.write "\n"))))
-
-  (my_print (% "a = %s" a))
-  (my_print (% "b = %s" b))
-  (setf z (my_add a b))
-  (my_print (str z))
-  (setf z (my_mult a b))
-  (my_print (str z)))
-""")
-
-
-
-# testing make-dict, make-list, getf and setf(getf)
-test_source(r"""
-(let ((m (make-dict (1 "foo") (2 "bar") (3 None) (4 (make-list 9 8 7 6))))
-      (my_print (lambda (s) (stdout.write s) (stdout.write "\n"))))
-
-  (my_print (% "m[1] = %r" (getf m 1)))
-  (my_print (% "m[2] = %r" (getf m 2)))
-  (my_print (% "m[3] = %r" (getf m 3)))
-  (my_print (% "m[4] = %r" (getf m 4)))
-  (my_print (% "m[4][0] = %r" (getf (getf m 4) 0)))
-  (setf (getf m 3) (getf (getf m 4) 0))
-  (my_print (% "new m[3] = %r" (getf m 3))))
-""")
+        assert(type(result) == type(lambda:None))
+        assert(result(1) == 1)
+        assert(result(1) == 2)
+        assert(result(500) == 502)
+        assert(result(-20) == 482)
 
 
+    def test_make_list_dict_getf_setf(self):
+        src = r"""
+        (let ((m (make-dict (1 "foo")
+                            (2 "bar")
+                            (3 None)
+                            (4 (make-list 9 8 7 6)))))
 
-# testing let, lambda, and setf as a closure
-loony = test_source(r"""
-(let ((z 0))
-  (lambda (x) (setf z (+ z x)) z))
-""")
+            (setf (getf m "message")
+                  (make-list
+                      (% "m[1] = %r" (getf m 1))
+                      (% "m[2] = %r" (getf m 2))
+                      (% "m[3] = %r" (getf m 3))
+                      (% "m[4] = %r" (getf m 4))
+                      (% "m[4][0] = %r" (getf (getf m 4) 0))))
 
-print "loony = %r" % loony
-print "loony(1) =", loony(1)
-print "loony(1) =", loony(1)
-print "loony(500) =", loony(500)
-print "loong(-20) =", loony(-20)
+            (setf (getf m 9) "tacos")
+            (setf (getf m 3) (getf (getf m 4) 0))
+            m)
+        """
+
+        result = eval_spexy(src)
+
+        # from make-dict
+        assert(result[1] == 'foo')
+        assert(result[2] == 'bar')
+        assert(result[3] == 9)
+        assert(result[4] == [9, 8, 7, 6])
+        assert(result[9] == 'tacos')
+
+        assert(result['message'] == [
+            "m[1] = 'foo'",
+            "m[2] = 'bar'",
+            "m[3] = None",
+            "m[4] = [9, 8, 7, 6]",
+            "m[4][0] = 9", ])
+        
+
+    def test_lambda_operators_unwrapped(self):
+        src = r"""
+        (let ((my_add (lambda (x y) (+ x y)))
+              (my_mult (lambda (x y) (* x y)))
+              (a 5)
+              (b 6))
+        
+            (make-list
+                (% "a = %s" a)
+                (% "b = %s" b)
+                (my_add a b)
+                (my_mult a b)
+                my_add
+                my_mult))
+        """
+        result = eval_spexy(src)
+
+        assert(result[0] == "a = 5")
+        assert(result[1] == "b = 6")
+        assert(result[2] == 11)
+        assert(result[3] == 30)
+        assert(result[4](7, 11) == 18)
+        assert(result[5](7, 11) == 77)
 
 
+    def test_while(self):
+        counter = count(0, 5)
 
-# testing member
-test_source(r"""
-(let ((x "Hello World"))
-  x.split)
-""")
+        src = r"""
+        (let ((x 0)
+              (bump (partial next counter)))
 
+            (while (< x 5)
+                (setf x (+ x 1))
+                (make-list x (bump))))
+        """
 
+        result = eval_spexy(src, with_locals=locals())
 
-# testing call member
-test_source(r"""
-(let ((x "Hello World"))
-  (x.split))
-""")
-
-
-
-# testing while
-test_source(r"""
-(let ((x 0)
-      (my_print (lambda (s)
-                  (stdout.write (str s))
-                  (stdout.write "\n") s)))
-
-  (while (< x 5)
-    (my_print x)
-    (setf x (+ x 1))))
-""")
-
+        assert(result[0] == 5)
+        assert(result[1] == 20)
+        assert(next(counter) == 25)
 
 
 # testing for-each
@@ -181,31 +281,6 @@ test_source(r"""
 (let ((my_print (lambda (s) (stdout.write (str s)) (stdout.write "\n"))))
   (for-each (lambda (i) (my_print i)) (xrange 0 5)))
 """)
-
-
-
-# testing define
-test_source(r"""
-(let ((a 1)
-      (b 2))
-
-  (define c (+ a b))
-  c)
-""")
-
-
-
-#testing define shadowing. Note that we cannot shadow the current
-#frame's arguments, only earlier frames
-test_source(r"""
-(let ((x 100))
-  (let ((a 1)
-        (b 2))
-
-    (define x (+ a b))
-    x))
-""")
-
 
 
 # generate-while evaluates to a generator which will evaluate the body
@@ -219,23 +294,6 @@ genny = test_source(r"""
 """)
 for i in genny:
     print "genny yielded", i
-
-
-
-# the defclass form becomes (define name (class "name" ...))
-test_source(r"""
-(defclass Foo (object)
-  ((x 50)
-   (get_x (lambda (self) self.x))
-   (set_x (lambda (self x) (setf self.x x)))))
-""")
-
-f = Foo()
-print f
-print f.get_x()
-f.set_x(100)
-print f.x
-
 
 
 #
