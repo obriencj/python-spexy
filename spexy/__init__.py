@@ -36,7 +36,7 @@ license: LGPL v.3
 
 from cStringIO import StringIO
 from functools import partial
-from itertools import counter, imap
+from itertools import chain, count, imap, izip, repeat
 import sys
 
 
@@ -200,9 +200,9 @@ def macro_import_from(mod, mem, *more):
 
 def macro_letrec(vars, *body):
     empties = [(k,None) for k,v in vars]
-    setup = [seq("setf", k, v) for k,v in vars]
+    setup = (seq("setf", k, v) for k,v in vars)
     return ("let", empties,
-            seq("progn", seq("progn", *setup), *body))
+            (seq("progn", *setup) + body))
 
 
 def macro_member_call(var, mem, *args):
@@ -214,9 +214,9 @@ def macro_when(cond, *body):
 
 
 def macro_while(cond, *body):
-    a, b = gensym(), gensym()
+    #a, b = gensym(), gensym()
     return ("reduce",
-            ("lambda", (a, b), b),
+            ("lambda", ("_a", "_b"), "_b"),
             seq("generate-while", cond, *body),
             False)
 
@@ -352,34 +352,67 @@ def special_not(ns, tok, item):
     return "(not %s)" % evaluate(ns, item)
 
 
-def macro_print(*items):
-    return seq("let", ((g1, (".", ("__import__", '"sys"'), "stdout")),
-                       (g2, (".", g1, "write"))),
-               *map(lambda i:  items))
+#def macro_print(*items):
+#    g1, g2 = gensym(), gensym()
+#    return seq("let", ((g1, (".", ("__import__", '"sys"'), "stdout")),
+#                       (g2, (".", g1, "write"))),
+#               *map(lambda i:  items))
 
 
-def special_print(ns, tok, item):
-    a = gensym()
-    ln = (tok == "println")
+#def special_print(ns, tok, item):
+#
+#    #
+#    #pr_ln = (lambda _a: type(lambda:None) \
+#    #         (compile('print _a', '', 'single'),
+#    #          locals())())
+#
+#    a = gensym()
+#    ln = (tok == "println")
+#
+#    funt = "type(lambda:None)"
+#    comp = "compile('print %s%s', '', 'single')" % \
+#           (a, (",","")[ln])
+#
+#    return "(lambda %s: %s(%s, locals())())(%s)" % \
+#           (a, funt, comp, evaluate(ns, item))
 
-    funt = "type(lambda:None)"
-    comp = "compile('print %s%s', '', 'single')" % \
-           (a, (",","")[ln])
 
-    return "(lambda %s: %s(%s, locals())())(%s)" % \
-           (a, funt, comp, evaluate(ns, item))
+#def special_print_to(ns, tok, stream, item):
+#    a, b = gensym(), gensym()
+#    ln = (tok == "println-to")
+#
+#    funt = "type(lambda:None)"
+#    comp = "compile('print >> %s, %s%s', '', 'single')" % \
+#           (a, b, (",","")[ln])
+#
+#    return "(lambda %s,%s: %s(%s, locals())())(%s, %s)" % \
+#           (a, b, funt, comp, evaluate(ns, stream), evaluate(ns, item))
 
 
-def special_print_to(ns, tok, stream, item):
-    a, b = gensym(), gensym()
-    ln = (tok == "println-to")
+def special_print(ns, tok, *items):
+    its = (evaluate(ns, i) for i in items)
+    itsa = list(chain(*izip(its, repeat('" "'))))
 
-    funt = "type(lambda:None)"
-    comp = "compile('print >> %s, %s%s', '', 'single')" % \
-           (a, b, (",","")[ln])
+    if tok == "println":
+        itsa[-1] = r"'\n'"
+    else:
+        itsa.pop()
 
-    return "(lambda %s,%s: %s(%s, locals())())(%s, %s)" % \
-           (a, b, funt, comp, evaluate(ns, stream), evaluate(ns, item))
+    return "__import__('sys').stdout.writelines(map(str, (%s)))" % \
+        comma(itsa)
+
+
+def special_print_to(ns, tok, stream, *items):
+    its = (evaluate(ns, i) for i in items)
+    itsa = list(chain(*izip(its, repeat('" "'))))
+
+    if tok == "println":
+        itsa[-1] = r"'\n'"
+    else:
+        itsa.pop()
+
+    return "%s.writelines(map(str, (%s)))" % \
+        (evaluate(ns, stream), comma(itsa))
 
 
 def special_progn(ns, tok, *body):
@@ -402,7 +435,7 @@ def special_set(ns, tok, lhs, rhs):
                     (evaluate(ns, rhs)))
 
         else:
-            raise Error("malformed setf")
+            raise SpexyFormException("malformed setf")
 
     else:
         if "." in lhs:
