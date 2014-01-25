@@ -94,7 +94,7 @@ def gen_exprs(fd):
     token = None
 
     for c in next_fd_gen(fd):
-        if c in ';#/\"\'() \n\r\t':
+        if c in ';#\"\'() \n\r\t':
             if token:
                 yield token.getvalue()
                 token = None
@@ -221,6 +221,23 @@ def macro_while(cond, *body):
             False)
 
 
+def macro_try(progn, *rest):
+    hndls = list()
+
+    for r in rest:
+        k = r[0]
+        c = r[1:]
+        if isinstance(k, (list, tuple)):
+            h = seq("lambda", ("exc_type","exc_val","exc_tb"), *c)
+        elif k in (":else",":finally"):
+            h = seq("lambda", tuple(), *c)
+        else:
+            raise SpexyFormException("malformed try")
+        hndls.append((k, h))
+
+    return seq("trycall", seq("lambda", tuple(), progn), *hndls)
+
+
 macros = {
     "!": macro_member_call,
     "class": macro_class,
@@ -234,6 +251,7 @@ macros = {
     "letrec": macro_letrec,
     "when": macro_when,
     "while": macro_while,
+    "try": macro_try,
     }
 
 
@@ -460,6 +478,67 @@ def special_set(ns, tok, lhs, rhs):
             return setter(lhs, evaluate(ns, rhs))
 
 
+def gen_try(exc, els=None, fin=None):
+    ret = list()
+
+    ret.append("def try_block(try_clause")
+    for i,e in enumerate(exc):
+        ret.append(",except_%i" % i)
+    if els:
+        ret.append(",else_clause")
+    if fin:
+        ret.append(",finally_clause")
+    ret.append("):\n")
+
+    ret.append("\tfrom sys import exc_info\n")
+
+    ret.append("\ttry:\n\t\t")
+    if not els:
+        ret.append("return ")
+    ret.append("try_clause()\n")
+    for i,e in enumerate(exc):
+        ts = e[0]
+        if ts:
+            ret.append("\texcept (")
+            ret.append(",".join(map(str,e[0])))
+            ret.append(",):\n")
+        else:
+            ret.append("\texcept:\n")
+        ret.append("\t\treturn except_%i(*exc_info())\n" % i)
+
+    if els:
+        ret.append("\telse:\n\t\treturn else_clause()\n")
+    if fin:
+        ret.append("\tfinally:\n\t\tfinally_clause()\n")
+
+    return "".join(ret)
+
+
+def special_trycall(ns, tok, prog, *rest):
+    errs = list()
+    els = None
+    fin = None
+
+    for k,c in rest:
+        if isinstance(k, (list,tuple)):
+            errs.append(([evaluate(ns, e) for e in k], evaluate(ns, c)))
+        elif k == ":else":
+            els = evaluate(ns, c)
+        elif k == ":finally":
+            fin = evaluate(ns, c)
+
+    trycode = gen_try(errs, els, fin)
+    hndls = [e[1] for e in errs]
+    if els:
+        hndls.append(els)
+    if fin:
+        hndls.append(fin)
+
+    return "(lambda _lcls:(eval(compile(%r,'<spexy>','single')," \
+        "globals(),_lcls), _lcls)[-1])({})['try_block'](%s,%s)" % \
+        (trycode, evaluate(ns, prog), comma(hndls))
+
+
 specials = {
     "+": special_op,
     "*": special_op,
@@ -503,6 +582,7 @@ specials = {
     "println-to": special_print_to,
     "progn": special_progn,
     "setf": special_set,
+    "trycall": special_trycall,
     }
 
 
@@ -679,7 +759,7 @@ def evaluate(ns, expr):
         ns = ns_new()
 
     try:
-        if isinstance(expr, list) or isinstance(expr, tuple):
+        if isinstance(expr, (list, tuple)):
             return eval_tree(ns, expr)
         else:
             return eval_token(ns, expr)
