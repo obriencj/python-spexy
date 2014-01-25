@@ -54,13 +54,13 @@ def do_add(x, y):
 
 class EvaluateTests(TestCase):
 
-    def test_let_with_unwrapped(self):
+    def test_let_unwrapped(self):
         src = r""" (let ((a 1) (b 2)) (do_add a b)) """
         result = eval_spexy(src)
         assert(result == 3)
 
 
-    def test_letrec_with_unwrapped(self):
+    def test_letrec_unwrapped(self):
         src = r"""
         (letrec ((a 1)
                  (b 5)
@@ -71,7 +71,7 @@ class EvaluateTests(TestCase):
         assert(result == 7)
 
 
-    def test_when_with_unwrapped(self):
+    def test_when_unwrapped(self):
         src = r"""
         (when False (do_add 1 2))
         """
