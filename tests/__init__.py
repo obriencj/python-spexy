@@ -262,8 +262,6 @@ class EvaluateTests(TestCase):
 
 
     def test_while(self):
-        counter = count(0, 5)
-
         src = r"""
         (let ((x 0)
               (bump (partial next (count 0 5))))
@@ -301,6 +299,7 @@ class EvaluateTests(TestCase):
         # generate-while evaluates to a generator which will evaluate
         # the body for each value while the condition still evaluates
         # to True
+
         genny = test_source(r"""
         (let ((c 0))
             (generate-while (< c 5)
