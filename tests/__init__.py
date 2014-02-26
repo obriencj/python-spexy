@@ -1,16 +1,16 @@
+
+
 """
 Some test calls to spexy.
 
-TODO: make this use unittest
-
-author: Christopher O'Brien  <siege@preoccupied.net>
-
+author: Christopher O'Brien  <obriencj@gmail.com>
+license: LGPL v.3
 """
 
 
 from cStringIO import StringIO
 from functools import partial
-from itertools import count
+from itertools import count, imap
 from sys import stdout
 from unittest import TestCase
 
@@ -38,9 +38,12 @@ def eval_spexy(src_str, with_globals=None, with_locals=None):
 
     # convert spexy src string into a Python src string
     peva = build_spexy(src_str)
+    
+    # compile it
+    code = compile(peva, '<spexy>', 'eval')
 
     # evaluate the resulting Python code
-    return eval(peva, with_globals, with_locals)
+    return eval(code, with_globals, with_locals)
 
 
 def test_source(src_str):
@@ -57,7 +60,8 @@ class EvaluateTests(TestCase):
     def test_let_unwrapped(self):
         src = r""" (let ((a 1) (b 2)) (do_add a b)) """
         result = eval_spexy(src)
-        assert(result == 3)
+
+        self.assertEqual(result, 3)
 
 
     def test_letrec_unwrapped(self):
@@ -262,38 +266,51 @@ class EvaluateTests(TestCase):
 
         src = r"""
         (let ((x 0)
-              (bump (partial next counter)))
+              (bump (partial next (count 0 5))))
 
             (while (< x 5)
                 (setf x (+ x 1))
                 (make-list x (bump))))
         """
 
-        result = eval_spexy(src, with_locals=locals())
+        result = eval_spexy(src)
 
         assert(result[0] == 5)
         assert(result[1] == 20)
-        assert(next(counter) == 25)
 
 
-# testing for-each
-test_source(r"""
-(let ((my_print (lambda (s) (stdout.write (str s)) (stdout.write "\n"))))
-  (for-each (lambda (i) (my_print i)) (xrange 0 5)))
-""")
+    def test_for_each(self):
+        src = r"""
+        (letrec ((out (StringIO))
+                 (my_print (lambda (s)
+                             (out.write (str s))
+                             (out.write "\n"))))
+            (for-each
+                (lambda (i) (my_print i))
+                (xrange 0 5))
+            (out.getvalue))
+        """
+
+        result = eval_spexy(src)
+        exp = "\n".join(imap(str, xrange(0, 5))) + "\n"
+
+        self.assertEqual(result, exp)
 
 
-# generate-while evaluates to a generator which will evaluate the body
-# for each value while the condition still evaluates to True
-genny = test_source(r"""
-(let ((c 0))
-  (generate-while (< c 5)
-    (let ((x c))
-      (setf c (+ c 1))
-      x)))
-""")
-for i in genny:
-    print "genny yielded", i
+    def test_generate_while(self):
+        # generate-while evaluates to a generator which will evaluate
+        # the body for each value while the condition still evaluates
+        # to True
+        genny = test_source(r"""
+        (let ((c 0))
+            (generate-while (< c 5)
+                (let ((x c))
+                    (setf c (+ c 1))
+                    x)))
+        """)
+
+        g = tuple(genny)
+        self.assertEqual(g, tuple(xrange(0, 5)))
 
 
 #
